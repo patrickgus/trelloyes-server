@@ -4,6 +4,7 @@ const morgan = require("morgan");
 const cors = require("cors");
 const helmet = require("helmet");
 const winston = require("winston");
+const uuid = require("uuid/v4");
 const { NODE_ENV } = require("./config");
 
 const app = express();
@@ -13,6 +14,7 @@ const morganOption = NODE_ENV === "production" ? "tiny" : "common";
 app.use(morgan(morganOption));
 app.use(helmet());
 app.use(cors());
+app.use(express.json());
 
 const logger = winston.createLogger({
   level: "info",
@@ -85,6 +87,78 @@ app.get("/list/:id", (req, res) => {
   }
 
   res.json(list);
+});
+
+app.post("/card", (req, res) => {
+  const { title, content } = req.body;
+
+  if (!title) {
+    logger.error(`Title is required`);
+    return res.status(400).send("Invalid data");
+  }
+
+  if (!content) {
+    logger.error(`Content is required`);
+    return res.status(400).send("Invalid data");
+  }
+
+  const id = uuid();
+
+  const card = {
+    id,
+    title,
+    content
+  };
+
+  cards.push(card);
+
+  logger.info(`Card with id ${id} created`);
+
+  res
+    .status(201)
+    .location(`http://localhost:8000/card/${id}`)
+    .json(card);
+});
+
+app.post("/list", (req, res) => {
+  const { header, cardIds = [] } = req.body;
+
+  if (!header) {
+    logger.error(`Header is required`);
+    return res.status(400).send("Invalid data");
+  }
+
+  if (cardIds.length > 0) {
+    let valid = true;
+    cardIds.forEach(cid => {
+      const card = cards.find(c => c.id == cid);
+      if (!card) {
+        logger.error(`Card with id ${cid} not found in cards array.`);
+        valid = false;
+      }
+    });
+
+    if (!valid) {
+      return res.status(400).send("Invalid data");
+    }
+  }
+
+  const id = uuid();
+
+  const list = {
+    id,
+    header,
+    cardIds
+  };
+
+  lists.push(list);
+
+  logger.info(`List with id ${id} created`);
+
+  res
+    .status(201)
+    .location(`http://localhost:8000/list/${id}`)
+    .json({ id });
 });
 
 app.use((error, req, res, next) => {
